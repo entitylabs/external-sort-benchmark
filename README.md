@@ -9,8 +9,10 @@
 * This file is served via http on http://localhost:9090/ at the end of process
 
 **Scripts**
-* run_all script executes the entire project end to end
-* run_all --sizes 1,2,4 can be used o limit run for specific sizes
+* > run_all script
+  executes the entire project end to end
+* > run_all --sizes 1,2,4
+  can be used o limit run for specific sizes
 
 **Docker Registry**
 * Port 5000 of the system is assumed to be free
