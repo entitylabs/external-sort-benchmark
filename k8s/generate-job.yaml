@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-data
+  namespace: sort-benchmark
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: generator
+          image: localhost:5001/external-sort:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - /app/src/generate_data.py
+            - --output
+            - /data/input.csv
+            - --records
+            - "280000000"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "2"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: benchmark-data

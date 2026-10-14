@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark-2gb
+  namespace: sort-benchmark
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: sort-benchmark
+        size: 2gb
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: sorter
+          image: localhost:5001/external-sort:latest
+          imagePullPolicy: Always
+          command: ["python", "/app/src/run_benchmark.py", "--ram-gb", "2"]
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+          env:
+            - name: TMPDIR
+              value: /tmp/sort-runs
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: sort-tmp
+              mountPath: /tmp/sort-runs
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: benchmark-data
+        - name: sort-tmp
+          emptyDir:
+            sizeLimit: 8Gi
