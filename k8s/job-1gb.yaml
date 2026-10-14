@@ -38,4 +38,4 @@ spec:
             claimName: benchmark-data
         - name: sort-tmp
           emptyDir:
-            sizeLimit: 8Gi
+            sizeLimit: 20Gi
