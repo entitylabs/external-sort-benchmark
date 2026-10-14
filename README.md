@@ -18,3 +18,19 @@
 * Docker file in the project is used for building project (Sort + benchmark results)
 * Result server servers the josn produced by sort jobs
 
+__Note:__
+We can monitor job status with
+
+```
+kubectl get pods -n sort-benchmark --watch
+```
+
+__Cleanup:__
+ For cleaning up the system post comletion we can run following command
+
+```
+Kubectl delete namespace sort-benchmark
+```
+
+
+
