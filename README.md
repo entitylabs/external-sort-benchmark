@@ -1,6 +1,6 @@
 # External Sort Benchmark
 
-Runs an external merge sort on ~5.3 GB of data inside Kubernetes pods limited to 1, 2, 4 and 8 GB of RAM, and measures how pod size affects performance.
+Runs an external merge sort on ~5 GB of data inside Kubernetes pods limited to 1, 2, 4 and 8 GB of RAM, and measures how pod size affects performance.
 
 ## Reference
 https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
@@ -14,7 +14,7 @@ The sort is done by GNU `sort`, a C implementation of external merge sort. An ea
 
 ## How it works
 
-1. **Generate data:** a Kubernetes Job writes `/data/input.csv` to a persistent volume: 280,000,000 `(userid, score)` rows, ~20 bytes each, ~5.3 GB. It is skipped if the file already exists.
+1. **Generate data:** a Kubernetes Job writes `/data/input.csv` to a persistent volume: 280,000,000 `(userid, score)` rows, ~20 bytes each, ~5 GB. It is skipped if the file already exists.
 2. **Sort:** one Job per RAM size (1, 2, 4, 8 GB) runs one after another. Each one sorts the file by `score` with GNU `sort` ([`src/external_sort.py`](src/external_sort.py)), using 2 threads to match the pod's CPU limit:
    * **Pass 0:** fill the memory buffer, sort it, and write it to a temporary file (a sorted run); repeat until the input is read
    * **Merge passes:** merge the runs, at most 16 at a time, into `/data/output_<size>gb.csv`. More than 16 runs means extra merge passes
@@ -68,7 +68,7 @@ docker rm -f local-registry
 
 ## Results
 
-280,000,000 records (5,472 MB). Docker Desktop on macOS, 16 GB RAM, 8 CPUs.
+280,000,000 records (~5GB). Docker Desktop on macOS, 16 GB RAM, 8 CPUs.
 
 | RAM  | Buffer (MB) | Total (s) | Throughput (MB/s) | CPU % | Disk read (MB) | Disk write (MB) | Peak memory (MB) |
 |------|-------------|-----------|-------------------|-------|----------------|-----------------|------------------|
@@ -77,14 +77,11 @@ docker rm -f local-registry
 | 4 GB | 1,638       | 160.7     | 34.05             | 154.6 | 9,137          | 10,944          | 1,639            |
 | 8 GB | 3,276       | 199.6     | 27.41             | 152.3 | 8,214          | 10,944          | 3,278            |
 
-The 8 GB run was repeated and took 205.2 s (same I/O), confirming it is slower than 4 GB.
-
-For comparison, the earlier pure-Python sort (600,000-row chunks, 467 runs) took 1,286.5 s on the 1 GB pod at 99.9% CPU, peaking at 269 MB: CPU-bound rather than disk-bound.
+The 8 GB run was repeated and took 205.2 s (same I/O), confirming it is slower than 4 GB
 
 **Observations**
 
 * **1 GB → 4 GB gets faster (203.6 s → 160.7 s).** A bigger buffer produces fewer sorted runs, so fewer merge passes are needed and less data is written (15,695 MB → 10,944 MB).
 * **4 GB and 8 GB both merge in one pass.** Both write exactly 10,944 MB, about 2× the input: once for the sorted runs, once for the output. The extra RAM at 8 GB saves no disk I/O.
 * **8 GB is slower than 4 GB.** Larger buffers mean longer CPU-only sorting phases, with less overlap between sorting and background disk writes. More RAM stops helping once the data merges in one pass.
-* **Peak memory matches the sort buffer**, so memory use is controlled by `--buffer-size`, not the pod limit. A 60% buffer was OOMKilled at 1 GB because written data waiting in the page cache also counts against the limit.
-* **CPU stays between 126% and 155% of the 2-core limit**: the sort is partly waiting on disk, unlike the Python version, which was CPU-bound at 99.9% of one core.
+* **Peak memory matches the sort buffer**, so memory use is controlled by `--buffer-size`, not the pod limit to prevent OOM.
