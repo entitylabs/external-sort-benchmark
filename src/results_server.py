@@ -7,6 +7,7 @@ PORT = 8080
 
 
 def load_results() -> list:
+    
     if not os.path.exists(RESULTS_FILE):
         return []
     with open(RESULTS_FILE) as f:
@@ -14,6 +15,7 @@ def load_results() -> list:
 
 
 class Handler(BaseHTTPRequestHandler):
+    
     def log_message(self, *_): pass
 
     def do_GET(self):
@@ -26,4 +28,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

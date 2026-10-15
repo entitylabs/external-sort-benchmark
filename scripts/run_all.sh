@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# Run everything end to end: build → generate data → benchmark
+# Build, generate data, and run benchmarks
 # Usage: bash scripts/run_all.sh [--sizes 1,2]
 set -euo pipefail
+DIR="$(dirname "$0")"
+source "$DIR/lib.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ "${1:-}" == --sizes ]] && export BENCHMARK_SIZES="${2//,/ }"
 
-export BENCHMARK_SIZES="1 2 4 8"
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --sizes) BENCHMARK_SIZES="${2//,/ }"; shift 2 ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
-  esac
-done
+# Start clean: removes old jobs, results and data (waits until fully gone)
+kubectl delete namespace "$NS" --ignore-not-found
 
-bash "$SCRIPT_DIR/02_build_and_load.sh"
-bash "$SCRIPT_DIR/03_generate_data.sh"
-bash "$SCRIPT_DIR/04_run_benchmarks.sh"
+bash "$DIR/02_build_and_load.sh"
+bash "$DIR/03_generate_data.sh"
+bash "$DIR/04_run_benchmarks.sh"

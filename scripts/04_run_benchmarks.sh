@@ -1,42 +1,19 @@
 #!/usr/bin/env bash
-# Run benchmark Jobs sequentially. Results written to /data/results.json on the PVC.
-# Opens http://localhost:9090 when complete.
+# Run the benchmark jobs one after another, then serve results on http://localhost:9090
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-K8S_DIR="$(dirname "$SCRIPT_DIR")/k8s"
-source "$SCRIPT_DIR/lib.sh"
-
-read -ra SIZES <<< "${BENCHMARK_SIZES:-1 2 4 8}"
-NODE_GB=$(node_allocatable_gb)
-read -ra SIZES <<< "$(filter_sizes "$NODE_GB" "${SIZES[@]}")"
-[ ${#SIZES[@]} -eq 0 ] && { err "No sizes fit on this node (~${NODE_GB}GB allocatable)"; exit 1; }
+source "$(dirname "$0")/lib.sh"
 
 kubectl apply -f "$K8S_DIR/results-server.yaml"
 
-for SIZE in "${SIZES[@]}"; do
+for SIZE in ${BENCHMARK_SIZES:-1 2 4 8}; do
   JOB="benchmark-${SIZE}gb"
-  echo "[ ${SIZE}GB ]"
-
-  kubectl delete job "$JOB" -n sort-benchmark --ignore-not-found=true
-  sleep 2
+  kubectl delete job "$JOB" -n "$NS" --ignore-not-found
   kubectl apply -f "$K8S_DIR/job-${SIZE}gb.yaml"
-
-  kubectl wait --for=condition=complete "job/$JOB" -n sort-benchmark --timeout=3600s 2>/dev/null || \
-  kubectl wait --for=condition=failed   "job/$JOB" -n sort-benchmark --timeout=10s   2>/dev/null || true
-
-  STATUS=$(kubectl get job "$JOB" -n sort-benchmark \
-    -o jsonpath='{.status.conditions[0].type}' 2>/dev/null || echo "Unknown")
-  [ "$STATUS" = "Failed" ] && warn "${SIZE}GB FAILED (OOMKilled?)" || ok "${SIZE}GB done"
-
-  kubectl delete job "$JOB" -n sort-benchmark --ignore-not-found=true
-  sleep 2
+  wait_for_job "$JOB" || echo "${SIZE}GB failed"
 done
 
-pkill -f "port-forward.*results-server" 2>/dev/null || true
-sleep 1
-kubectl port-forward svc/results-server 9090:8080 -n sort-benchmark &
+stop_results_forward
+kubectl port-forward svc/results-server 9090:8080 -n "$NS" &
 sleep 2
-open "http://localhost:9090" 2>/dev/null || xdg-open "http://localhost:9090" 2>/dev/null || true
-printf "Results at http://localhost:9090\n"
+open_url http://localhost:9090
 wait

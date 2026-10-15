@@ -1,40 +1,42 @@
 #!/usr/bin/env bash
 # Shared helpers for benchmark scripts
 
-ok()   { printf "\033[0;32m[ok] %s\033[0m\n" "$*"; }
-warn() { printf "\033[1;33m[warn] %s\033[0m\n" "$*"; }
-err()  { printf "\033[0;31m[err] %s\033[0m\n" "$*" >&2; }
+NS=sort-benchmark
+K8S_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../k8s" && pwd)"
 
-parse_mem_to_gb() {
-  local raw="$1"
-  if [[ "$raw" =~ ^([0-9]+)Gi$ ]]; then
-    echo "${BASH_REMATCH[1]}"
-  elif [[ "$raw" =~ ^([0-9]+)Mi$ ]]; then
-    echo $(( ${BASH_REMATCH[1]} / 1024 ))
-  elif [[ "$raw" =~ ^([0-9]+)Ki$ ]]; then
-    echo $(( ${BASH_REMATCH[1]} / 1024 / 1024 ))
-  elif [[ "$raw" =~ ^([0-9]+)$ ]]; then
-    echo $(( ${BASH_REMATCH[1]} / 1024 / 1024 / 1024 ))
+# Block until the job finishes; non-zero exit if it failed
+wait_for_job() {
+
+  local status
+  while true; do
+    status=$(kubectl get job "$1" -n "$NS" -o jsonpath='{.status.succeeded}/{.status.failed}')
+    [[ $status == 1/* ]] && return 0
+    [[ $status == */1 ]] && return 1
+    sleep 5
+  done
+}
+
+is_windows() {
+
+  case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac
+}
+
+stop_results_forward() {
+
+  if is_windows; then
+    powershell.exe -NoProfile -Command \
+      "Get-CimInstance Win32_Process -Filter \"Name='kubectl.exe'\" | Where-Object { \$_.CommandLine -like '*port-forward*results-server*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" \
+      2>/dev/null || true
   else
-    echo "6"
+    pkill -f "port-forward.*results-server" || true
   fi
 }
 
-node_allocatable_gb() {
-  local raw
-  raw=$(kubectl get nodes -o jsonpath='{.items[0].status.allocatable.memory}' 2>/dev/null || echo "6Gi")
-  parse_mem_to_gb "$raw"
-}
-
-filter_sizes() {
-  local node_gb="$1"; shift
-  local runnable=()
-  for s in "$@"; do
-    if (( s >= node_gb )); then
-      warn "${s}GB pod won't fit — node has ~${node_gb}GB. Increase Docker Desktop memory." >&2
-    else
-      runnable+=("$s")
-    fi
-  done
-  echo "${runnable[@]}"
+open_url() {
+  
+  if is_windows; then
+    cmd.exe /c start "" "$1" || true
+  else
+    open "$1" 2>/dev/null || xdg-open "$1" || true
+  fi
 }
