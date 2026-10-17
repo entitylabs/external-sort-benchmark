@@ -4,7 +4,7 @@ Runs an external merge sort on ~5 GB of data inside Kubernetes pods limited to 1
 
 ## Reference
 https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
-The sort is done by GNU `sort`, a C implementation of external merge sort. An earlier pure-Python version (based on https://github.com/melvilgit/external-Merge-Sort) was replaced because it was CPU-bound (see Results). (Python 3.12 does not support external merge sort out of box)
+The sort is done by GNU `sort`, a C implementation of external merge sort. An earlier pure-Python version (based on https://github.com/melvilgit/external-Merge-Sort) was replaced because it was CPU-bound (see Results),a lso OOB was replace as it was on a very onld python version 3.7. (Python 3.12 does not support external merge sort out of box)
 
 ## Requirements
 
